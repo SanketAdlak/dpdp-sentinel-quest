@@ -8,6 +8,8 @@ import { UIScene } from './scenes/UIScene';
 import { DialogueScene } from './scenes/DialogueScene';
 import { PIIRadarScene } from './scenes/minigames/PIIRadarScene';
 import { AuditPlazaScene } from './scenes/AuditPlazaScene';
+import { GameOverScene } from './scenes/GameOverScene';
+import { EndingScene } from './scenes/EndingScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -15,8 +17,11 @@ const config: Phaser.Types.Core.GameConfig = {
   height: GAME_HEIGHT,
   parent: 'game-container',
   backgroundColor: '#0a0a1a',
-  pixelArt: true,
-  antialias: false,
+  // antialias must be true so text and UI panels render crisply when the canvas
+  // is scaled up on 2K / HiDPI screens.  Sprites still look pixel-accurate
+  // because we use roundPixels on the world camera (set in HubWorldScene).
+  pixelArt: false,
+  antialias: true,
   physics: {
     default: 'arcade',
     arcade: {
@@ -33,13 +38,16 @@ const config: Phaser.Types.Core.GameConfig = {
     DialogueScene,
     PIIRadarScene,
     AuditPlazaScene,
+    GameOverScene,
+    EndingScene,
   ],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   render: {
-    pixelArt: true,
+    antialias: true,
+    roundPixels: true,   // keeps sprite positions on whole pixels → no wobble
   },
 };
 

@@ -10,6 +10,8 @@ export const SCENES = {
   UI: 'UIScene',
   DIALOGUE: 'DialogueScene',
   AUDIT_PLAZA: 'AuditPlazaScene',
+  GAME_OVER: 'GameOverScene',
+  ENDING: 'EndingScene',
 } as const;
 
 export const EVENTS = {

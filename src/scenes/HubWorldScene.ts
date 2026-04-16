@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, SCENES, EVENTS } from '../constants';
+import { GAME_WIDTH, GAME_HEIGHT, SCENES, EVENTS, FONT_UI } from '../constants';
 import { Player } from '../entities/Player';
 import { NPC, NPCConfig } from '../entities/NPC';
 import { HUD } from '../ui/HUD';
@@ -9,13 +9,15 @@ import { QuestSystem } from '../systems/QuestSystem';
 import { ScoreSummary, ScoreSnapshot } from '../ui/ScoreSummary';
 import { RoomBuilder } from '../world/RoomBuilder';
 import { QuestArrow } from '../ui/QuestArrow';
+import { KnowledgeQuiz, STAGE_QUIZZES, QuizConfig } from '../ui/KnowledgeQuiz';
+import { InventoryPanel } from '../ui/InventoryPanel';
 import { SaveSystem } from '../systems/SaveSystem';
 
 const NPC_CONFIGS: NPCConfig[] = [
   {
     id: 'auditor',
     name: 'Rakesh Sharma',
-    role: 'Grumpy Auditor',
+    role: 'Compliance Guide',
     spriteKey: 'npc_auditor',
     dialogue: 'auditor_intro',
     x: 200, y: 180,
@@ -47,12 +49,68 @@ const NPC_CONFIGS: NPCConfig[] = [
   {
     id: 'meity',
     name: 'Officer Gupta',
-    role: 'MeitY Representative',
+    role: 'Data Protection Board',
     spriteKey: 'npc_meity',
     dialogue: 'meity_intro',
     x: 808, y: 1200,
   },
+  {
+    id: 'marketing',
+    name: 'Meena Kapoor',
+    role: 'Marketing Manager',
+    spriteKey: 'npc_ceo',
+    dialogue: 'marketing_intro',
+    x: 700, y: 650,
+  },
+  {
+    id: 'rbi',
+    name: 'Suresh Bajaj',
+    role: 'Compliance Officer',
+    spriteKey: 'npc_auditor',
+    dialogue: 'rbi_intro',
+    x: 1350, y: 200,
+  },
+  {
+    id: 'safeharbor',
+    name: 'Dr. Pooja Nair',
+    role: 'Child Safety Lead',
+    spriteKey: 'npc_lawyer',
+    dialogue: 'safeharbor_intro',
+    x: 1350, y: 650,
+  },
+  {
+    id: 'cloud',
+    name: 'Arjun Shah',
+    role: 'Cloud Architect',
+    spriteKey: 'npc_dev',
+    dialogue: 'cloud_intro',
+    x: 250, y: 1200,
+  },
 ];
+
+// ── District friendly names for locked-room messages ───────────────────────
+const DISTRICT_NAMES: Record<string, string> = {
+  server:     'Server District',
+  rbi:        'RBI Vault',
+  legal:      'Legal Tower',
+  marketing:  'Marketing Floor',
+  safeharbor: 'Safe Harbor',
+  cloud:      'Cloud Frontier',
+  audit:      'Audit Plaza',
+};
+
+// ── District locking zones ──────────────────────────────────────────────────
+// Each zone defines the pixel area that belongs to a district.
+// If the district is locked, the player cannot enter this area.
+const DISTRICT_ZONES: Record<string, { x: number; y: number; w: number; h: number }[]> = {
+  server:     [{ x: 570, y:   0, w: 610, h: 450 }],  // Server + corridor
+  rbi:        [{ x: 1160, y:  0, w: 570, h: 450 }],  // RBI Vault
+  legal:      [{ x:   0, y: 450, w: 570, h: 510 }],  // Legal Tower + corridor
+  marketing:  [{ x: 570, y: 450, w: 610, h: 510 }],  // Marketing Floor + corridor
+  safeharbor: [{ x: 1160, y: 450, w: 570, h: 510 }], // Safe Harbor
+  cloud:      [{ x:   0, y: 970, w: 570, h: 470 }],  // Cloud Frontier + corridor
+  audit:      [{ x: 570, y: 970, w: 610, h: 470 }],  // Audit Plaza + corridor
+};
 
 // ── Day Events System ────────────────────────────────────────────────────────
 
@@ -75,67 +133,67 @@ const DAY_EVENTS: DayEvent[] = [
   {
     day: 3,
     id: 'ev_complaint_day3',
-    title: 'COMPLAINT FILED',
-    message: 'User Priya Krishnamurthy has filed a complaint with the Data Protection Board. She alleges IndiaScale shared her contact details with 3 marketing partners without her consent. The Board has given you 15 days to respond.',
+    title: 'USER COMPLAINT RECEIVED',
+    message: 'A user named Priya Krishnamurthy has complained to the government\'s Data Protection Board. She says IndiaScale shared her contact details with marketing companies without asking her permission. The Board wants a response within 15 days.',
     type: 'complaint',
     debtDelta: 10,
     trustDelta: -5,
-    dpdpSection: '§6 — Consent / §13 — Grievance Redressal',
-    penalty: '₹50 Crore if unresolved',
+    dpdpSection: 'Consent & Grievance Rules',
+    penalty: 'Fine possible if ignored',
     triggered: false,
   },
   {
     day: 6,
     id: 'ev_breach_day6',
-    title: 'SECURITY BREACH DETECTED',
-    message: 'CRITICAL: An automated scraper exploited an unsecured API endpoint and extracted 2,400 user records including names, emails, and partial Aadhaar numbers. The 72-hour notification clock has started.',
+    title: 'DATA LEAK DETECTED',
+    message: 'URGENT: A security gap in one of our APIs exposed 2,400 user accounts — names, emails, and partial ID numbers. When user data is leaked like this, we are legally required to notify the government within 72 hours. The clock has started.',
     type: 'breach',
     debtDelta: 20,
     trustDelta: -15,
-    dpdpSection: 'Rule 7 — Breach Notification',
-    penalty: '₹200 Crore if unreported within 72 hours',
-    startQuestId: 'q_m6_breach',
+    dpdpSection: 'Breach Notification Rule',
+    penalty: 'Large fine if not reported within 72 hours',
+    startQuestId: 'q_stage4_deeper',
     triggered: false,
   },
   {
     day: 10,
     id: 'ev_erasure_day10',
-    title: 'ERASURE REQUEST: OVERDUE',
-    message: 'Journalist Rahul Nair submitted a Right to Erasure request 10 days ago. IndiaScale has no deletion pipeline — the request is sitting unanswered. The 30-day response window is 33% expired.',
+    title: 'DELETION REQUEST OVERDUE',
+    message: 'Journalist Rahul Nair asked us to delete his personal data 10 days ago. We haven\'t responded yet. Users have the legal right to have their data deleted. We have 30 days total — and we\'ve already used up 10 of them.',
     type: 'erasure',
     debtDelta: 15,
     trustDelta: -10,
-    dpdpSection: '§13 — Right to Erasure',
-    penalty: '₹150 Crore + individual liability for DPO',
+    dpdpSection: 'User Right to Erasure',
+    penalty: 'Fine for ignoring deletion requests',
     triggered: false,
   },
   {
     day: 14,
     id: 'ev_techdebt_day14',
-    title: 'TECHNICAL DEBT ALERT',
-    message: 'Lead Dev Priya reports: the team has been asked to implement DPDP compliance features but the product backlog has 127 pending items. Privacy features keep getting deprioritized. 3 critical security patches are overdue by 60+ days.',
+    title: 'PRIVACY FEATURES DEPRIORITIZED',
+    message: 'Priya reports: the engineering team keeps pushing privacy-related work to the bottom of the backlog. Three important security fixes are now 60 days overdue. This isn\'t just a compliance risk — it\'s a real security vulnerability.',
     type: 'internal',
     debtDelta: 10,
-    dpdpSection: '§8 — Security Safeguards',
+    dpdpSection: 'Data Security Rules',
     triggered: false,
   },
   {
     day: 18,
     id: 'ev_spotcheck_day18',
-    title: 'REGULATORY INSPECTION',
-    message: 'Officer Gupta has arrived for an unannounced spot check. He has requested: (1) Your current Privacy Policy URL, (2) Your Consent Manager registration number, (3) Your Grievance Officer\'s contact details. You have 30 minutes.',
+    title: 'GOVERNMENT INSPECTOR ARRIVING',
+    message: 'Officer Gupta from the Data Protection Board is stopping by for a routine check. He\'ll want to see: your Privacy Notice (what you tell users about their data), how you handle user consent, and how users can raise concerns. You have 30 minutes to prepare.',
     type: 'regulatory',
     complianceDelta: 5,
     debtDelta: 10,
-    dpdpSection: '§5 Notice, §6 Consent, §13 Grievance',
-    penalty: '₹250 Crore if no documentation provided',
+    dpdpSection: 'Privacy Notice, Consent & Grievance',
+    penalty: 'Fine if documentation is missing',
     triggered: false,
   },
   {
     day: 21,
     id: 'ev_vc_day21',
-    title: 'SERIES C DUE DILIGENCE CRISIS',
-    message: 'Sequoia\'s legal team has sent a 47-point DPDP compliance questionnaire as part of due diligence for the Series C. The CEO is threatening to fire the compliance team if the round falls through. You have 7 days to complete the assessment.',
+    title: 'INVESTORS ASKING ABOUT PRIVACY',
+    message: 'The venture capital team for our Series C has sent a detailed questionnaire about our privacy practices. This is now standard for large funding rounds — investors don\'t want to back companies with hidden compliance risks. We have 7 days to respond.',
     type: 'vc',
     trustDelta: -5,
     complianceDelta: 0,
@@ -144,23 +202,23 @@ const DAY_EVENTS: DayEvent[] = [
   {
     day: 24,
     id: 'ev_insider_day24',
-    title: 'INSIDER THREAT DISCOVERED',
-    message: 'Security audit reveals a former employee downloaded 18,000 customer records to a personal Dropbox account before their exit 2 months ago. This is a separate breach that must be reported independently to the Board.',
+    title: 'FORMER EMPLOYEE DATA INCIDENT',
+    message: 'A security review found that a former team member copied 18,000 customer records to their personal Dropbox before leaving the company 2 months ago. This is a data breach — even if unintentional — and must be reported to the government.',
     type: 'internal',
     debtDelta: 25,
     trustDelta: -20,
-    dpdpSection: 'Rule 7 — Breach Notification (Insider Breach)',
-    penalty: '₹200 Crore per unreported breach event',
+    dpdpSection: 'Breach Notification Rule',
+    penalty: 'Fine for each unreported breach',
     triggered: false,
   },
   {
     day: 27,
     id: 'ev_preaudit_day27',
-    title: '3 DAYS TO AUDIT',
-    message: 'The Data Protection Board has confirmed: your MeitY audit begins in 3 days. Officer Gupta will conduct a full systems audit. Prepare: Privacy Policy, Consent records, Deletion pipeline, Breach logs, DPO appointment letter, and Cross-border transfer documentation.',
+    title: '3 DAYS TO THE AUDIT',
+    message: 'The government audit begins in 3 days. Officer Gupta will review everything. Make sure you have: an up-to-date Privacy Notice, clear consent records, a process for handling deletion requests, a record of any data leaks, and contact details for your Privacy Officer.',
     type: 'warning',
     complianceDelta: 0,
-    dpdpSection: 'All Sections',
+    dpdpSection: 'All Privacy Rules',
     triggered: false,
   },
 ];
@@ -176,7 +234,17 @@ export class HubWorldScene extends Phaser.Scene {
   private scoreSummary!: ScoreSummary;
   private roomBuilder!: RoomBuilder;
   private questArrow!: QuestArrow;
+  private knowledgeQuiz!: KnowledgeQuiz;
+  private inventoryPanel!: InventoryPanel;
   private talkedNPCs: Set<string> = new Set();
+  private lockedRoomToastLastShown: number = 0;
+  private pendingQuiz: Omit<QuizConfig, 'onComplete'> | null = null;
+
+  // External (singleton) listener references for cleanup
+  private _scoreChangeHandler!: () => void;
+  private _questCompletedHandler!: (quest: import('../systems/QuestSystem').Quest) => void;
+  private _questStartedHandler!: (quest: import('../systems/QuestSystem').Quest) => void;
+  private _objectiveCompletedHandler!: (quest: import('../systems/QuestSystem').Quest, objectiveId?: string) => void;
 
   constructor() {
     super({ key: SCENES.HUB_WORLD });
@@ -213,6 +281,11 @@ export class HubWorldScene extends Phaser.Scene {
     this.player.update();
     this.checkNPCProximity();
     this.questArrow.update(this.player.x, this.player.y);
+
+    // Prevent world content from appearing behind the HUD bar (56px tall)
+    if (this.cameras.main.scrollY < 56) {
+      this.cameras.main.scrollY = 56;
+    }
   }
 
   private buildWorld(): void {
@@ -228,6 +301,72 @@ export class HubWorldScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, 1728, 1440);
 
     this.buildMinimap();
+    this.buildLockedDoorOverlays();
+  }
+
+  // Door positions for each district (approximate centre of the entrance gap)
+  private readonly DOOR_SIGNS: Array<{ districtId: string; x: number; y: number; label: string }> = [
+    { districtId: 'server',     x: 592,  y: 208,  label: 'Server District' },
+    { districtId: 'rbi',        x: 1200, y: 208,  label: 'RBI Vault' },
+    { districtId: 'legal',      x: 256,  y: 468,  label: 'Legal Tower' },
+    { districtId: 'marketing',  x: 800,  y: 468,  label: 'Marketing Floor' },
+    { districtId: 'safeharbor', x: 1410, y: 468,  label: 'Safe Harbor' },
+    { districtId: 'cloud',      x: 256,  y: 980,  label: 'Cloud Frontier' },
+    { districtId: 'audit',      x: 800,  y: 980,  label: 'Audit Plaza' },
+  ];
+
+  private lockedOverlays: Map<string, Phaser.GameObjects.Container> = new Map();
+
+  private buildLockedDoorOverlays(): void {
+    for (const door of this.DOOR_SIGNS) {
+      const container = this.add.container(door.x, door.y).setDepth(30);
+
+      const bg = this.add.rectangle(0, 0, 140, 36, 0x000000, 0.78)
+        .setOrigin(0.5)
+        .setStrokeStyle(1, 0x666666);
+
+      const lockIcon = this.add.text(-50, 0, '🔒', {
+        fontFamily: 'Courier New', fontSize: '13px',
+      }).setOrigin(0.5);
+
+      const label = this.add.text(8, 0, door.label, {
+        fontFamily: 'Courier New', fontSize: '10px', color: '#aaaaaa',
+      }).setOrigin(0.5);
+
+      container.add([bg, lockIcon, label]);
+
+      // Hide if already unlocked (e.g. restored from save)
+      if (QuestSystem.isDistrictUnlocked(door.districtId)) {
+        container.setVisible(false);
+      }
+
+      this.lockedOverlays.set(door.districtId, container);
+    }
+
+    // Listen for district unlocks to destroy the overlay
+    QuestSystem.on('quest-completed', () => {
+      for (const door of this.DOOR_SIGNS) {
+        if (QuestSystem.isDistrictUnlocked(door.districtId)) {
+          const overlay = this.lockedOverlays.get(door.districtId);
+          if (overlay) {
+            overlay.destroy();
+            this.lockedOverlays.delete(door.districtId);
+          }
+        }
+      }
+    });
+
+    QuestSystem.on('quest-started', () => {
+      for (const door of this.DOOR_SIGNS) {
+        if (QuestSystem.isDistrictUnlocked(door.districtId)) {
+          const overlay = this.lockedOverlays.get(door.districtId);
+          if (overlay) {
+            overlay.destroy();
+            this.lockedOverlays.delete(door.districtId);
+          }
+        }
+      }
+    });
   }
 
   private buildMinimap(): void {
@@ -291,9 +430,31 @@ export class HubWorldScene extends Phaser.Scene {
       // ── World-bounds guard ────────────────────────────────────────────────
       if (tx < 0 || tx > 1727 || ty < 0 || ty > 1439) return false;
 
+      // ── Locked district check ─────────────────────────────────────────────
+      // Block movement into districts that haven't been unlocked yet.
+      for (const [districtId, zones] of Object.entries(DISTRICT_ZONES)) {
+        if (!QuestSystem.isDistrictUnlocked(districtId)) {
+          const blocked = zones.some(
+            z => tx >= z.x && tx < z.x + z.w && ty >= z.y && ty < z.y + z.h
+          );
+          if (blocked) {
+            // Debounce the toast — show at most once every 3 seconds
+            const now = Date.now();
+            if (now - this.lockedRoomToastLastShown > 3000) {
+              this.lockedRoomToastLastShown = now;
+              const label = DISTRICT_NAMES[districtId] ?? districtId;
+              this.toast?.show({
+                type: 'warning',
+                message: `🔒 ${label} is locked. Complete your current quest to unlock this area.`,
+                duration: 3000,
+              });
+            }
+            return false;
+          }
+        }
+      }
+
       // ── Walkable-area check ───────────────────────────────────────────────
-      // The player sprite center (tx, ty) must lie inside at least one
-      // walkable rect (room inner floor, door gap, or corridor).
       const inWalkable = walkable.some(
         r => tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h
       );
@@ -305,7 +466,6 @@ export class HubWorldScene extends Phaser.Scene {
         const b = (child as Phaser.Physics.Arcade.Sprite)
           .body as Phaser.Physics.Arcade.StaticBody;
         if (b && b.enable) {
-          // Overlap test (strict — touching edges are NOT overlapping)
           if (
             tx - 10 < b.x + b.width  &&
             tx + 10 > b.x            &&
@@ -327,24 +487,43 @@ export class HubWorldScene extends Phaser.Scene {
     const serverZone = this.add.zone(864, 208, 448, 352).setDepth(0);
     this.physics.world.enable(serverZone);
 
-    const serverLabel = this.add.text(640 + 16, 32 + 50, '[ F ] PII Radar Scan', {
-      fontFamily: 'Courier New', fontSize: '11px', color: '#0066aa',
-    }).setVisible(false);
+    const serverLabel = this.add.text(640 + 16, 32 + 50, '[ F ]  Run PII Radar Scan', {
+      fontFamily: "'Inter', system-ui, Arial, sans-serif", fontSize: '13px',
+      color: '#ffffff', backgroundColor: '#0055aa', padding: { x: 8, y: 4 },
+    }).setDepth(20).setVisible(false);
 
+    // Track whether player is in server zone — show hint while inside, hide when leaving
+    let inServerZone = false;
     this.physics.add.overlap(this.player, serverZone, () => {
-      if (!serverLabel.visible) {
+      if (!inServerZone) {
+        inServerZone = true;
         serverLabel.setVisible(true);
-        this.time.delayedCall(3000, () => serverLabel.setVisible(false));
       }
+    });
+
+    // Hide hint when player leaves server zone
+    this.time.addEvent({
+      delay: 200,
+      loop: true,
+      callback: () => {
+        const nowInZone = Phaser.Geom.Rectangle.Contains(
+          new Phaser.Geom.Rectangle(640, 32, 448, 352),
+          this.player.x, this.player.y
+        );
+        if (inServerZone && !nowInZone) {
+          inServerZone = false;
+          serverLabel.setVisible(false);
+        }
+      },
     });
 
     const fKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F);
     fKey.on('down', () => {
-      const inServerZone = Phaser.Geom.Rectangle.Contains(
+      const nowInZone = Phaser.Geom.Rectangle.Contains(
         new Phaser.Geom.Rectangle(640, 32, 448, 352),
         this.player.x, this.player.y
       );
-      if (inServerZone) this.launchPIIRadar();
+      if (nowInZone) this.launchPIIRadar();
     });
 
     // ── Audit Plaza ── Final boss entry
@@ -357,7 +536,7 @@ export class HubWorldScene extends Phaser.Scene {
     }).setVisible(false);
 
     this.physics.add.overlap(this.player, auditZone, () => {
-      const auditQuest = QuestSystem.getQuest('q_m12_audit');
+      const auditQuest = QuestSystem.getQuest('q_stage5_audit');
       if (auditQuest?.status === 'active' && !auditLabel.visible) {
         auditLabel.setVisible(true);
         this.time.delayedCall(4000, () => auditLabel.setVisible(false));
@@ -370,7 +549,7 @@ export class HubWorldScene extends Phaser.Scene {
         new Phaser.Geom.Rectangle(640, 1056, 448, 352),
         this.player.x, this.player.y
       );
-      const auditQuest = QuestSystem.getQuest('q_m12_audit');
+      const auditQuest = QuestSystem.getQuest('q_stage5_audit');
       if (inAuditZone && auditQuest?.status === 'active') {
         this.launchAuditPlaza();
       }
@@ -400,8 +579,10 @@ export class HubWorldScene extends Phaser.Scene {
     this.dayTimer?.destroy();
     this.cameras.main.fadeOut(600, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.stop(SCENES.UI);
-      this.scene.start(SCENES.AUDIT_PLAZA);
+      if (this.scene.isActive(SCENES.UI)) this.scene.stop(SCENES.UI);
+      // Route to ending after audit — AuditPlazaScene should emit audit-result
+      // For now, go directly to EndingScene (AuditPlazaScene can be integrated later)
+      this.scene.start(SCENES.ENDING);
     });
   }
 
@@ -416,6 +597,13 @@ export class HubWorldScene extends Phaser.Scene {
     this.hud = new HUD(this);
     this.toast = new NotificationToast(this);
     this.scoreSummary = new ScoreSummary(this);
+    this.knowledgeQuiz = new KnowledgeQuiz(this);
+    this.inventoryPanel = new InventoryPanel(this);
+
+    // [I] key toggles the inventory panel
+    this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.I).on('down', () => {
+      this.inventoryPanel.toggle();
+    });
   }
 
   private checkNPCProximity(): void {
@@ -439,6 +627,8 @@ export class HubWorldScene extends Phaser.Scene {
   }
 
   private setupEventListeners(): void {
+    // ── Scene (Phaser) events — auto-cleaned by Phaser on scene shutdown ───────
+
     this.events.on('player-interact', (npcId: string) => {
       const npc = this.npcs.find(n => n.npcId === npcId);
       if (!npc) return;
@@ -446,7 +636,7 @@ export class HubWorldScene extends Phaser.Scene {
       // If already talked to this NPC, show a greeting instead
       if (this.talkedNPCs.has(npcId)) {
         this.showNPCGreeting(npcId, npc.x, npc.y);
-        return; // don't relaunch dialogue
+        return;
       }
 
       // Snapshot score before dialogue
@@ -457,7 +647,7 @@ export class HubWorldScene extends Phaser.Scene {
         trustRating: state.trustRating,
         privacyCoins: state.privacyCoins,
       };
-      this.currentDialogueNPC = { name: npc.npcName, role: npc.dialogueKnot };
+      this.currentDialogueNPC = { name: npc.npcName, role: npc.role };
 
       this.player.setInteracting(true);
       this.scene.launch(SCENES.DIALOGUE, {
@@ -471,7 +661,30 @@ export class HubWorldScene extends Phaser.Scene {
     this.events.on(EVENTS.DIALOGUE_END, (npcId?: string) => {
       if (npcId) this.talkedNPCs.add(npcId);
 
-      // Show score summary, then release player on dismiss
+      // If debt crossed 100% during the dialogue, handle game over now
+      if (ScoreSystem.isGameOver()) {
+        this.triggerGameOver();
+        return;
+      }
+
+      // Complete quest objectives for this NPC BEFORE showing the score summary
+      // so the summary reflects any quest-reward score changes too.
+      if (npcId) {
+        const objMap: Record<string, { questId: string; objId: string }> = {
+          auditor:    { questId: 'q_stage1_hq',    objId: 'talk_rakesh'        },
+          ceo:        { questId: 'q_stage1_hq',    objId: 'talk_ceo'           },
+          dev:        { questId: 'q_stage2_server', objId: 'talk_priya'         },
+          lawyer:     { questId: 'q_stage3_legal',  objId: 'talk_anjali'        },
+          marketing:  { questId: 'q_stage4_deeper', objId: 'review_consent'     },
+          rbi:        { questId: 'q_stage4_deeper', objId: 'check_retention'    },
+          safeharbor: { questId: 'q_stage4_deeper', objId: 'safeguard_children' },
+          meity:      { questId: 'q_stage5_audit',  objId: 'talk_gupta'         },
+        };
+        const mapping = objMap[npcId];
+        if (mapping) QuestSystem.completeObjective(mapping.questId, mapping.objId);
+      }
+
+      // Show score summary — on dismiss, check if a quiz was deferred during dialogue
       const before = this.scoreBeforeDialogue;
       const npcInfo = this.currentDialogueNPC;
       if (before && npcInfo) {
@@ -480,52 +693,70 @@ export class HubWorldScene extends Phaser.Scene {
           npcInfo.role,
           before,
           () => {
-            this.player.setInteracting(false);
+            // After score summary: show pending quiz if one was queued while dialogue ran
+            if (this.pendingQuiz) {
+              this.showQuizNow(this.pendingQuiz);
+              this.pendingQuiz = null;
+            } else {
+              this.player.setInteracting(false);
+            }
           }
         );
       } else {
-        this.player.setInteracting(false);
+        if (this.pendingQuiz) {
+          this.showQuizNow(this.pendingQuiz);
+          this.pendingQuiz = null;
+        } else {
+          this.player.setInteracting(false);
+        }
       }
       this.scoreBeforeDialogue = null;
       this.currentDialogueNPC = null;
-
-      // Also handle quest objective completion from dialogue end
-      if (npcId) {
-        const objMap: Record<string, { questId: string; objId: string }> = {
-          auditor: { questId: 'q_m1_onboarding', objId: 'talk_rakesh' },
-          dev:     { questId: 'q_m1_onboarding', objId: 'talk_priya'  },
-          lawyer:  { questId: 'q_m1_onboarding', objId: 'talk_anjali' },
-        };
-        const mapping = objMap[npcId];
-        if (mapping) QuestSystem.completeObjective(mapping.questId, mapping.objId);
-      }
     });
 
     this.game.events.on(EVENTS.SHOW_NOTIFICATION, (config: Parameters<NotificationToast['show']>[0]) => {
       this.toast.show(config);
     });
 
-    ScoreSystem.on('change', () => {
-      if (ScoreSystem.isGameOver()) this.triggerGameOver();
-    });
+    // ── Singleton listeners — must be stored and removed on scene shutdown ─────
 
-    // Quest completion → toast + banner
-    QuestSystem.on('quest-completed', (quest) => {
+    this._scoreChangeHandler = () => {
+      // Never interrupt an active dialogue with a game-over transition.
+      if (ScoreSystem.isGameOver() && !this.scene.isActive(SCENES.DIALOGUE)) {
+        this.triggerGameOver();
+      }
+    };
+    ScoreSystem.on('change', this._scoreChangeHandler);
+
+    // Quest completion → banner + optional knowledge quiz
+    this._questCompletedHandler = (quest) => {
       this.showQuestCompleteBanner(quest.title, quest.rewardCompliance, quest.rewardCoins);
-    });
+
+      const quizData = STAGE_QUIZZES[quest.id];
+      if (!quizData) return;
+
+      if (this.scene.isActive(SCENES.DIALOGUE)) {
+        // Dialogue still running — defer the quiz until after dialogue + score summary
+        this.pendingQuiz = quizData;
+      } else {
+        // No dialogue active — show quiz after a short banner-display delay
+        this.showQuizNow(quizData);
+      }
+    };
+    QuestSystem.on('quest-completed', this._questCompletedHandler);
 
     // Quest start → info toast
-    QuestSystem.on('quest-started', (quest) => {
+    this._questStartedHandler = (quest) => {
       this.toast.show({
         type: 'info',
-        message: `New Quest: ${quest.title}\n${quest.description}`,
-        dpdpSection: quest.dpdpSection,
+        message: `New Area Unlocked: ${quest.title}\n${quest.description}`,
         duration: 5000,
       });
-    });
+    };
+    QuestSystem.on('quest-started', this._questStartedHandler);
 
     // Objective completed → small toast
-    QuestSystem.on('objective-completed', (quest, objectiveId) => {
+    this._objectiveCompletedHandler = (quest, objectiveId) => {
       const obj = quest.objectives.find(o => o.id === objectiveId);
       if (obj) {
         this.toast.show({
@@ -534,6 +765,37 @@ export class HubWorldScene extends Phaser.Scene {
           duration: 3000,
         });
       }
+    };
+    QuestSystem.on('objective-completed', this._objectiveCompletedHandler);
+
+    // ── Cleanup external listeners when this scene shuts down ─────────────────
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      ScoreSystem.off('change', this._scoreChangeHandler);
+      QuestSystem.off('quest-completed', this._questCompletedHandler);
+      QuestSystem.off('quest-started',   this._questStartedHandler);
+      QuestSystem.off('objective-completed', this._objectiveCompletedHandler);
+      this.game.events.off(EVENTS.SHOW_NOTIFICATION);
+    });
+  }
+
+  /** Show a quiz immediately (with a short delay for banner to appear first). */
+  private showQuizNow(quizData: Omit<QuizConfig, 'onComplete'>): void {
+    this.player.setInteracting(true);
+    this.time.delayedCall(2800, () => {
+      this.knowledgeQuiz.show({
+        ...quizData,
+        onComplete: (score, total) => {
+          this.player.setInteracting(false);
+          const pct = Math.round((score / total) * 100);
+          this.toast.show({
+            type: score >= total * 0.67 ? 'success' : 'warning',
+            message: pct === 100
+              ? 'Perfect score! You really understand this topic.'
+              : `Quiz done — ${score}/${total} correct. Keep going!`,
+            duration: 4000,
+          });
+        },
+      });
     });
   }
 
@@ -580,218 +842,94 @@ export class HubWorldScene extends Phaser.Scene {
   }
 
   private registerQuests(): void {
+    // ── STAGE 1: HQ Introduction ─────────────────────────────────────────────
+    // Learn what personal data is and why it matters.
+    // Only HQ is accessible. Completing this unlocks Server District.
     QuestSystem.registerQuest({
-      id: 'q_m1_onboarding',
-      title: 'The Onboarding from Hell',
-      description: "Understand the full scope of IndiaScale's DPDP violations.",
-      dpdpSection: '§1–4 — Scope & Grounds for Processing',
+      id: 'q_stage1_hq',
+      title: 'Day 1: What Are We Dealing With?',
+      description: 'Talk to Rakesh and the CEO to understand the privacy situation at IndiaScale.',
+      dpdpSection: 'What is Personal Data? Why does it matter?',
       status: 'active',
       rewardCompliance: 10,
       rewardCoins: 100,
       rewardTrust: 10,
       penaltyDebt: 0,
-      unlocks: ['marketing', 'q_m2_notice'],
+      unlocks: ['server', 'q_stage2_server'],
       objectives: [
-        { id: 'talk_rakesh', description: 'Get the violation list from Rakesh Sharma', completed: false },
-        { id: 'talk_priya',  description: "Understand IndiaScale's data flows with Priya", completed: false },
-        { id: 'talk_anjali', description: 'Assess legal exposure with Anjali Mehta', completed: false },
+        { id: 'talk_rakesh', description: 'Speak with Rakesh — the compliance guide in HQ', completed: false },
+        { id: 'talk_ceo',    description: 'Speak with Vikram (CEO) about the business case for privacy', completed: false },
       ],
     });
 
+    // ── STAGE 2: Server District ─────────────────────────────────────────────
+    // Learn about data security and sensitive information.
+    // Unlocked after Stage 1. Completing this unlocks Legal Tower.
     QuestSystem.registerQuest({
-      id: 'q_m2_notice',
-      title: 'Notice Me, Senpai',
-      description: 'Overhaul the privacy notice and fix dark patterns in consent.',
-      dpdpSection: '§5 Notice, §6 Consent',
-      status: 'inactive',
-      rewardCompliance: 20,
-      rewardCoins: 150,
-      rewardTrust: 10,
-      penaltyDebt: 0,
-      unlocks: ['legal', 'q_m3_pii_hunt'],
-      objectives: [
-        { id: 'find_notice',   description: 'Locate the current privacy notice', completed: false },
-        { id: 'fix_notice',    description: 'Draft a plain-language compliant notice', completed: false },
-        { id: 'fix_consent',   description: 'Replace pre-ticked consent with opt-in', completed: false },
-        { id: 'dark_patterns', description: 'Identify and remove 3 dark patterns', completed: false },
-      ],
-    });
-
-    QuestSystem.registerQuest({
-      id: 'q_m3_pii_hunt',
-      title: 'The PII Scavenger Hunt',
-      description: "Find all hidden PII across IndiaScale's infrastructure.",
-      dpdpSection: '§8 — Obligations of Data Fiduciary',
-      status: 'inactive',
-      rewardCompliance: 20,
-      rewardCoins: 150,
-      rewardTrust: 5,
-      penaltyDebt: 0,
-      unlocks: ['q_m4_consent_mgr'],
-      objectives: [
-        { id: 'find_s3',          description: 'Scan the S3 bucket exports for PII', completed: false },
-        { id: 'find_slack',       description: 'Check Slack integration logs', completed: false },
-        { id: 'find_csv',         description: 'Locate old CSV exports with user data', completed: false },
-        { id: 'find_third_party', description: 'Audit third-party tools (Freshdesk, Mixpanel)', completed: false },
-      ],
-    });
-
-    QuestSystem.registerQuest({
-      id: 'q_m4_consent_mgr',
-      title: 'Consent Manager, Assemble',
-      description: 'Integrate a Consent Manager so users can manage all their consents.',
-      dpdpSection: 'Rule 4 — Consent Manager',
-      status: 'inactive',
-      rewardCompliance: 20,
-      rewardCoins: 200,
-      rewardTrust: 15,
-      penaltyDebt: 0,
-      unlocks: ['safe_harbor', 'q_m5_children'],
-      objectives: [
-        { id: 'design_dashboard',  description: 'Design the consent dashboard UI', completed: false },
-        { id: 'add_withdrawal',    description: 'Ensure withdrawal is as easy as consent', completed: false },
-        { id: 'integrate_manager', description: 'Integrate or build Consent Manager', completed: false },
-      ],
-    });
-
-    QuestSystem.registerQuest({
-      id: 'q_m5_children',
-      title: 'Children of the Algorithm',
-      description: 'Fix age verification and implement Verifiable Parental Consent.',
-      dpdpSection: "§9, Rule 5 — Children's Data & VPC",
-      status: 'inactive',
-      rewardCompliance: 25,
-      rewardCoins: 200,
-      rewardTrust: 10,
-      penaltyDebt: 0,
-      unlocks: ['q_m6_breach'],
-      objectives: [
-        { id: 'age_gate',       description: 'Replace self-declaration with real age verification', completed: false },
-        { id: 'vpc_flow',       description: 'Build the Verifiable Parental Consent flow', completed: false },
-        { id: 'child_features', description: 'Disable behavioral ads and dark patterns for children', completed: false },
-      ],
-    });
-
-    QuestSystem.registerQuest({
-      id: 'q_m6_breach',
-      title: 'The 72-Hour Breach Sprint',
-      description: 'A data breach! Notify the Board within 72 hours.',
-      dpdpSection: 'Rule 7 — Breach Notification',
-      status: 'inactive',
-      rewardCompliance: 25,
-      rewardCoins: 150,
-      rewardTrust: 15,
-      penaltyDebt: 30,
-      unlocks: ['rbi_vault', 'q_m7_erasure'],
-      objectives: [
-        { id: 'confirm_breach',      description: 'Confirm scope — how many users affected?', completed: false },
-        { id: 'notify_board',        description: 'Notify the Data Protection Board within 72hr', completed: false },
-        { id: 'notify_users',        description: 'Send plain-language breach notice to users', completed: false },
-        { id: 'notify_processors',   description: 'Notify all data sub-processors', completed: false },
-        { id: 'rbi_conflict_breach', description: 'Resolve RBI transaction log conflict', completed: false },
-      ],
-    });
-
-    QuestSystem.registerQuest({
-      id: 'q_m7_erasure',
-      title: 'The Erasure Paradox',
-      description: "Handle a journalist's erasure request across all systems.",
-      dpdpSection: '§13, Rule 8 — Right to Erasure',
-      status: 'inactive',
-      rewardCompliance: 25,
-      rewardCoins: 200,
-      rewardTrust: 10,
-      penaltyDebt: 0,
-      unlocks: ['q_m8_rights_portal'],
-      objectives: [
-        { id: 'map_data_stores',  description: "Map all systems containing this user's data", completed: false },
-        { id: 'cascade_delete',   description: 'Execute cascading deletion across all systems', completed: false },
-        { id: 'pseudonymize_rbi', description: 'Pseudonymize RBI transaction records (not delete)', completed: false },
-        { id: 'deletion_receipt', description: 'Generate and send deletion receipt to user', completed: false },
-      ],
-    });
-
-    QuestSystem.registerQuest({
-      id: 'q_m8_rights_portal',
-      title: 'Right There in Plain Sight',
-      description: 'Build a Privacy Dashboard covering all 6 Data Principal rights.',
-      dpdpSection: '§11–15 — All Data Principal Rights',
-      status: 'inactive',
-      rewardCompliance: 20,
-      rewardCoins: 150,
-      rewardTrust: 20,
-      penaltyDebt: 0,
-      unlocks: ['q_m9_sdf'],
-      objectives: [
-        { id: 'right_access',     description: 'Add data access / export feature', completed: false },
-        { id: 'right_correction', description: 'Add data correction feature', completed: false },
-        { id: 'right_erasure',    description: 'Add self-service erasure request', completed: false },
-        { id: 'right_grievance',  description: 'Add grievance mechanism with SLA', completed: false },
-        { id: 'right_nomination', description: 'Add Data Principal Nomination feature (§15)', completed: false },
-        { id: 'right_withdrawal', description: 'Add consent withdrawal equal to consent giving', completed: false },
-      ],
-    });
-
-    QuestSystem.registerQuest({
-      id: 'q_m9_sdf',
-      title: 'Significant or Not?',
-      description: 'Assess if IndiaScale qualifies as a Significant Data Fiduciary.',
-      dpdpSection: '§10, Rule 10 — SDF Obligations',
-      status: 'inactive',
-      rewardCompliance: 20,
-      rewardCoins: 100,
-      rewardTrust: 10,
-      penaltyDebt: 0,
-      unlocks: ['cloud_frontier', 'q_m10_cross_border'],
-      objectives: [
-        { id: 'sdf_assessment', description: 'Complete the SDF self-assessment questionnaire', completed: false },
-        { id: 'appoint_dpo',    description: 'Appoint a Data Protection Officer', completed: false },
-        { id: 'conduct_dpia',   description: 'Conduct a DPIA for the recommendation engine', completed: false },
-        { id: 'schedule_audit', description: 'Schedule an independent data audit', completed: false },
-      ],
-    });
-
-    QuestSystem.registerQuest({
-      id: 'q_m10_cross_border',
-      title: 'The Cloud Frontier',
-      description: 'Map all cross-border data flows and build a migration plan.',
-      dpdpSection: 'Rule 12 — Cross-Border Transfer',
+      id: 'q_stage2_server',
+      title: 'The Data Detective',
+      description: "Explore the Server District with Priya and discover what data IndiaScale is actually storing.",
+      dpdpSection: 'Data Security — Protecting User Information',
       status: 'inactive',
       rewardCompliance: 15,
-      rewardCoins: 100,
-      rewardTrust: 5,
+      rewardCoins: 120,
+      rewardTrust: 10,
       penaltyDebt: 0,
-      unlocks: ['q_m11_zombie'],
+      unlocks: ['legal', 'q_stage3_legal'],
       objectives: [
-        { id: 'data_flow_map',   description: 'Build a complete data flow map (all SaaS tools)', completed: false },
-        { id: 'risk_assessment', description: 'Assess cross-border risk for each tool', completed: false },
-        { id: 'migration_plan',  description: 'Create a data localization contingency plan', completed: false },
+        { id: 'talk_priya',      description: 'Talk to Priya in the Server District', completed: false },
+        { id: 'complete_pii_scan', description: 'Run the PII Radar scan (Press F in Server District)', completed: false },
       ],
     });
 
+    // ── STAGE 3: Legal Tower ─────────────────────────────────────────────────
+    // Learn that users have rights over their own data.
+    // Unlocked after Stage 2. Completing this unlocks Marketing, RBI, Safe Harbor.
     QuestSystem.registerQuest({
-      id: 'q_m11_zombie',
-      title: 'The Zombie Accounts Apocalypse',
-      description: "Clean up 2.3M inactive accounts per Rule 8's retention rules.",
-      dpdpSection: "Rule 8 — Storage Limitation / Zombie Accounts",
+      id: 'q_stage3_legal',
+      title: 'Users Have Rights',
+      description: 'Visit the Legal Tower and learn about the rights users have over their personal information.',
+      dpdpSection: 'User Rights — Deletion, Correction, Access',
       status: 'inactive',
       rewardCompliance: 20,
       rewardCoins: 150,
-      rewardTrust: 5,
+      rewardTrust: 15,
       penaltyDebt: 0,
-      unlocks: ['q_m12_audit'],
+      unlocks: ['marketing', 'rbi', 'safeharbor', 'q_stage4_deeper'],
       objectives: [
-        { id: 'define_inactive', description: 'Define the inactivity threshold (3 years)', completed: false },
-        { id: 'send_notices',    description: 'Send re-confirmation notices to inactive users', completed: false },
-        { id: 'execute_purge',   description: 'Execute batch deletion of non-responding accounts', completed: false },
+        { id: 'talk_anjali', description: 'Meet with Anjali (Privacy Lawyer) in the Legal Tower', completed: false },
       ],
     });
 
+    // ── STAGE 4: Wider Building ──────────────────────────────────────────────
+    // Marketing Floor, RBI Vault, and Safe Harbor now accessible.
+    // Learn about consent, data retention conflicts, and children's data.
+    // Completing this unlocks Cloud Frontier and Audit Plaza.
     QuestSystem.registerQuest({
-      id: 'q_m12_audit',
-      title: 'The MeitY Tribunal',
-      description: 'Face the Data Protection Board in the final audit.',
-      dpdpSection: 'All Sections — Final Synthesis',
+      id: 'q_stage4_deeper',
+      title: 'Putting It All Together',
+      description: 'Explore the Marketing Floor, RBI Vault, and Safe Harbor to understand consent, retention rules, and vulnerable users.',
+      dpdpSection: 'Consent, Retention Conflicts, Children\'s Data',
+      status: 'inactive',
+      rewardCompliance: 25,
+      rewardCoins: 200,
+      rewardTrust: 15,
+      penaltyDebt: 0,
+      unlocks: ['cloud', 'audit', 'q_stage5_audit'],
+      objectives: [
+        { id: 'review_consent',     description: 'Review the consent process on the Marketing Floor', completed: false },
+        { id: 'check_retention',    description: 'Understand the data retention conflict in the RBI Vault', completed: false },
+        { id: 'safeguard_children', description: 'Review children\'s data protections in Safe Harbor', completed: false },
+      ],
+    });
+
+    // ── STAGE 5: Final Audit ─────────────────────────────────────────────────
+    // The government audit. Face Officer Gupta and apply everything learned.
+    QuestSystem.registerQuest({
+      id: 'q_stage5_audit',
+      title: 'The Government Audit',
+      description: 'Head to Audit Plaza and face the Data Protection Board inspector. Apply everything you\'ve learned.',
+      dpdpSection: 'All Privacy Principles — Final Assessment',
       status: 'inactive',
       rewardCompliance: 30,
       rewardCoins: 500,
@@ -799,14 +937,14 @@ export class HubWorldScene extends Phaser.Scene {
       penaltyDebt: 0,
       unlocks: [],
       objectives: [
-        { id: 'audit_round1', description: 'Pass Round 1: Compliance Foundations', completed: false },
-        { id: 'audit_round2', description: 'Pass Round 2: User Rights', completed: false },
-        { id: 'audit_round3', description: 'Pass Round 3: Incident Response', completed: false },
+        { id: 'talk_gupta',    description: 'Meet Officer Gupta in the Audit Plaza', completed: false },
+        { id: 'audit_round1',  description: 'Answer the Privacy Notice questions correctly', completed: false },
+        { id: 'audit_round2',  description: 'Demonstrate your consent mechanism', completed: false },
       ],
     });
 
-    // Start the first quest immediately
-    QuestSystem.startQuest('q_m1_onboarding');
+    // Start Stage 1
+    QuestSystem.startQuest('q_stage1_hq');
   }
 
   private startDayCycle(): void {
@@ -987,7 +1125,7 @@ export class HubWorldScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
     const overlayW = 580;
-    const overlayH = 380;
+    const overlayH = 420;
 
     // Full-screen dark backdrop (NOT inside container)
     const backdrop = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85)
@@ -997,55 +1135,61 @@ export class HubWorldScene extends Phaser.Scene {
       .setDepth(500)
       .setScrollFactor(0);
 
-    // Fully opaque dark bg
-    const bg = this.add.rectangle(0, 0, overlayW, overlayH, 0x0a1020, 1.0)
+    // Lighter panel — not pitch black
+    const bg = this.add.rectangle(0, 0, overlayW, overlayH, 0x0f2035, 1.0)
       .setOrigin(0.5)
       .setStrokeStyle(2, 0x00ffcc);
 
     const title = this.add.text(0, -overlayH / 2 + 26, 'WELCOME, PRIVACY CHAMPION', {
-      fontFamily: 'Courier New',
-      fontSize: '18px',
+      fontFamily: FONT_UI,
+      fontSize: '20px',
       color: '#ffdd44',
       fontStyle: 'bold',
+      resolution: 2,
     }).setOrigin(0.5);
 
-    const mission = this.add.text(0, -overlayH / 2 + 58, 'You are the new Privacy Champion at IndiaScale.\nFix DPDP compliance before the MeitY audit in 30 days\nor face \u20B9250 Crore fines.', {
-      fontFamily: 'Courier New',
-      fontSize: '13px',
-      color: '#ffffff',
+    const mission = this.add.text(0, -overlayH / 2 + 62, 'You are the new Privacy Champion at IndiaScale.\nA government audit arrives in 30 days.\nExplore the building, talk to the team, and learn\nhow to protect users\' personal information.', {
+      fontFamily: FONT_UI,
+      fontSize: '14px',
+      color: '#d8eef8',
       wordWrap: { width: 520 },
       align: 'center',
-      lineSpacing: 4,
+      lineSpacing: 5,
+      resolution: 2,
     }).setOrigin(0.5, 0);
 
-    const controlsHeader = this.add.text(0, -overlayH / 2 + 116, 'CONTROLS', {
-      fontFamily: 'Courier New',
-      fontSize: '12px',
+    const controlsHeader = this.add.text(0, -overlayH / 2 + 152, 'CONTROLS', {
+      fontFamily: FONT_UI,
+      fontSize: '13px',
       color: '#00ffcc',
       fontStyle: 'bold',
+      resolution: 2,
     }).setOrigin(0.5);
 
     const controlLines = [
-      '[WASD] or [Arrows]   Move around IndiaScale HQ',
-      '[E]                  Talk to NPCs when the ! bubble appears',
-      '[SPACE]              Advance dialogue / Skip typewriter effect',
-      '[1] [2] [3]          Select dialogue choices',
-      '[F]                  Activate PII Radar Scan (in Server District)',
-      '[ENTER]              Enter Audit Plaza when unlocked',
+      'WASD / Arrows        Move around IndiaScale HQ',
+      'E                    Talk to NPCs when the ! bubble appears',
+      'SPACE                Advance dialogue / skip typewriter',
+      '1   2   3            Select dialogue choices',
+      'F                    PII Radar Scan (in Server District)',
+      'ENTER                Enter Audit Plaza when unlocked',
+      'I                    Open / close Evidence Vault',
     ].join('\n');
 
-    const controlsText = this.add.text(-overlayW / 2 + 30, -overlayH / 2 + 134, controlLines, {
-      fontFamily: 'Courier New',
+    const controlsText = this.add.text(-overlayW / 2 + 30, -overlayH / 2 + 172, controlLines, {
+      fontFamily: FONT_UI,
       fontSize: '12px',
-      color: '#ffffff',
-      lineSpacing: 8,
+      color: '#c0d8ee',
+      lineSpacing: 7,
       wordWrap: { width: overlayW - 60 },
+      resolution: 2,
     });
 
-    const hint = this.add.text(0, overlayH / 2 - 22, 'Click anywhere to dismiss', {
-      fontFamily: 'Courier New',
-      fontSize: '11px',
-      color: '#667788',
+    const hint = this.add.text(0, overlayH / 2 - 16, 'Click anywhere to dismiss', {
+      fontFamily: FONT_UI,
+      fontSize: '12px',
+      color: '#7aa0bb',
+      resolution: 2,
     }).setOrigin(0.5);
 
     // Blinking dismiss hint
@@ -1102,36 +1246,46 @@ export class HubWorldScene extends Phaser.Scene {
     this.time.delayedCall(800, () => {
       this.toast.show({
         type: 'info',
-        message: 'Welcome to IndiaScale. MeitY audit in 30 days. Fix our DPDP compliance — or face \u20B9250 Crore fines.',
+        message: 'Welcome to IndiaScale! You\'re the new Privacy Champion. Talk to Rakesh in HQ to get started.',
         duration: 6000,
       });
     });
 
-    this.time.delayedCall(3000, () => {
-      this.toast.showLawViolation(
-        'DPDP Act 2023 — Status Check',
-        "IndiaScale currently has a Compliance Score of 20%. This is CRITICAL.",
-        '\u20B9250 Crore max fine'
-      );
+    this.time.delayedCall(4000, () => {
+      this.toast.show({
+        type: 'warning',
+        message: 'A government audit is coming in 30 days. IndiaScale needs to learn how to protect users\' data properly. Start by exploring HQ.',
+        duration: 6000,
+      });
     });
   }
 
   private triggerGameOver(): void {
     this.dayTimer?.destroy();
+    if (this.scene.isActive(SCENES.DIALOGUE)) this.scene.stop(SCENES.DIALOGUE);
+    if (this.scene.isActive(SCENES.UI))       this.scene.stop(SCENES.UI);
     this.cameras.main.fadeOut(600, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start(SCENES.MAIN_MENU);
+      this.scene.start(SCENES.GAME_OVER);
+    });
+  }
+
+  private triggerEnding(): void {
+    this.dayTimer?.destroy();
+    if (this.scene.isActive(SCENES.DIALOGUE)) this.scene.stop(SCENES.DIALOGUE);
+    if (this.scene.isActive(SCENES.UI))       this.scene.stop(SCENES.UI);
+    this.cameras.main.fadeOut(600, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start(SCENES.ENDING);
     });
   }
 
   private triggerBreachEvent(): void {
-    QuestSystem.startQuest('q_m6_breach');
+    QuestSystem.startQuest('q_stage4_deeper');
 
     this.toast.show({
       type: 'warning',
-      message: 'BREACH ALERT: S3 bucket exposed 12,000 user records for 6 hours. The 72-hour clock is ticking.',
-      dpdpSection: 'Rule 7 — Breach Notification',
-      penalty: '\u20B9200 Crore if unreported',
+      message: 'DATA LEAK: A storage misconfiguration exposed 12,000 user records for 6 hours. When this happens, you MUST notify the government within 72 hours. The clock is ticking.',
       duration: 10000,
     });
 
@@ -1147,17 +1301,28 @@ export class HubWorldScene extends Phaser.Scene {
 
   private triggerFinalAudit(): void {
     this.dayTimer?.destroy();
-    QuestSystem.startQuest('q_m12_audit');
+    QuestSystem.startQuest('q_stage5_audit');
+
+    // If player has enough compliance to pass, send them to the ending directly
+    if (ScoreSystem.passedAudit()) {
+      this.time.delayedCall(3000, () => this.triggerEnding());
+      this.toast.show({
+        type: 'success',
+        message: 'The MeitY audit is here! Your compliance score is strong — heading to final assessment.',
+        duration: 5000,
+      });
+      return;
+    }
+
+    // Otherwise: let player try the audit plaza one last time
     this.toast.show({
       type: 'warning',
-      message: 'MeitY Audit has begun! Head south to Audit Plaza and press [ E ] to face the Tribunal.',
-      dpdpSection: 'All Sections — Final Synthesis',
-      penalty: 'Up to \u20B9250 Crore',
+      message: 'The government audit has begun! Head south to Audit Plaza and press [ E ] to meet Officer Gupta.',
       duration: 10000,
     });
 
     const arrow = this.add.text(640, 620, 'V AUDIT PLAZA', {
-      fontFamily: 'Courier New', fontSize: '14px', color: '#ff4400',
+      fontFamily: FONT_UI, fontSize: '14px', color: '#ff4400',
     }).setOrigin(0.5).setDepth(100).setScrollFactor(0);
     this.tweens.add({
       targets: arrow, alpha: 0.1, duration: 600, yoyo: true, repeat: 8,
@@ -1168,34 +1333,34 @@ export class HubWorldScene extends Phaser.Scene {
   private showNPCGreeting(npcId: string, npcX: number, npcY: number): void {
     const greetings: Record<string, string[]> = {
       auditor:  [
-        'Those compliance reports better be on my desk by Friday.',
-        'I\'m watching IndiaScale\'s data practices. Every day.',
-        '§8(4) — Data Protection by Design. Have you read it?',
-        'Our audit window is shrinking. Fix the consent flows.',
+        'Remember — users trust you with their information. Treat it like you\'d treat your own.',
+        'Any new areas of the building you\'ve been able to explore?',
+        'The key question: do your users know what you\'re collecting, and did they agree to it?',
+        'Every day we don\'t fix this, the risk grows. Keep pushing forward.',
       ],
       dev:      [
-        'Pushed another privacy patch. Sleep is optional.',
-        'Did you check the S3 bucket permissions yet?',
-        'Our consent manager still needs a rework. Ask me later.',
-        'Server logs are interesting today... very interesting.',
+        'Just found another old export file. The data hygiene issue runs deep.',
+        'Good security is like a good lock — it only matters if you actually use it.',
+        'Our agreement with Freshdesk still isn\'t signed. I keep reminding them.',
+        'Server logs are very interesting today... in a concerning way.',
       ],
       ceo:      [
-        'The VCs are watching our compliance score very closely.',
-        'Privacy is good business. Never forget that.',
-        'Series C won\'t close itself. Get us compliant.',
-        'Legal just pinged me. We need to talk about the DPA.',
+        'Privacy done right is actually a competitive advantage. Users notice.',
+        'Investors are paying attention. Let\'s show them we\'re serious.',
+        'How\'s the consent cleanup going? I want to tell the board we\'ve made progress.',
+        'Every user who trusts us is worth more than any short-term growth hack.',
       ],
       lawyer:   [
-        'The 72-hour breach clock never stops ticking.',
-        'Have you filed that grievance response yet?',
-        'DPO appointment letter is on my desk. Have you signed it?',
-        '§13 says 30 days. We\'re at day 10. Move faster.',
+        'Has Meera\'s deletion request been fully processed yet?',
+        'The Privacy Officer role needs filling. Independence is non-negotiable.',
+        'Pseudonymization is an elegant solution — financial records intact, privacy protected.',
+        'Users have more rights over their data than most companies realize.',
       ],
       meity:    [
-        'The Board meets quarterly. Are you prepared?',
-        'Rule 7 is not optional, Sentinel.',
-        'We\'ve received your Section 5 notice. We\'re reviewing it.',
-        'Non-compliance fines start at ₹10,000. They go much higher.',
+        'We\'re here to help companies get this right, not just catch them out.',
+        'A good Privacy Notice is one a regular person can actually understand.',
+        'Withdrawing consent should be exactly as easy as giving it.',
+        'The goal is for your users to be able to trust you. Everything else follows from that.',
       ],
     };
 

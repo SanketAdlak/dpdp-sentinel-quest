@@ -530,9 +530,8 @@ export class PIIRadarScene extends Phaser.Scene {
       dpdpSection: '§8(5)',
     });
 
-    // Complete quest objectives with correct quest ID
-    QuestSystem.completeObjective('q_m3_pii_hunt', 'find_s3');
-    QuestSystem.completeObjective('q_m3_pii_hunt', 'find_slack');
+    // Complete the PII scan objective in Stage 2 quest
+    QuestSystem.completeObjective('q_stage2_server', 'complete_pii_scan');
 
     // Show done button
     this.showDoneButton(violations);

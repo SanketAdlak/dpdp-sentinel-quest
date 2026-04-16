@@ -40,11 +40,11 @@ export class ScoreSummary {
     this.panel = container;
 
     // Background
-    const bg = s.add.rectangle(0, 0, panelW, panelH, 0x050a14, 0.97)
+    const bg = s.add.rectangle(0, 0, panelW, panelH, 0x0d1e32, 0.97)
       .setOrigin(0.5).setStrokeStyle(2, 0x00ffcc);
 
     // Header
-    const headerBg = s.add.rectangle(0, -panelH / 2 + 28, panelW, 56, 0x001a33, 1).setOrigin(0.5);
+    const headerBg = s.add.rectangle(0, -panelH / 2 + 28, panelW, 56, 0x0a2540, 1).setOrigin(0.5);
     const headerText = s.add.text(0, -panelH / 2 + 14, 'CONVERSATION IMPACT', {
       fontFamily: FONT_UI, fontSize: '15px', color: '#00ffcc', fontStyle: 'bold',
     }).setOrigin(0.5);

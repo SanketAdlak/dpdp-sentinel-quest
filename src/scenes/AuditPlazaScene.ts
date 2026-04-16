@@ -703,7 +703,7 @@ export class AuditPlazaScene extends Phaser.Scene {
       this.showCharge();
     } else {
       // Complete this round's objective in QuestSystem
-      QuestSystem.completeObjective('q_m12_audit', `audit_round${this.roundIndex + 1}`);
+      QuestSystem.completeObjective('q_stage5_audit', `audit_round${this.roundIndex + 1}`);
 
       this.roundIndex++;
       this.chargeIndex = 0;
@@ -806,7 +806,8 @@ export class AuditPlazaScene extends Phaser.Scene {
 
   private showVerdict(): void {
     // Complete the final quest
-    QuestSystem.completeQuest('q_m12_audit');
+    QuestSystem.completeObjective('q_stage5_audit', 'talk_gupta');
+    QuestSystem.completeQuest('q_stage5_audit');
 
     const state = ScoreSystem.getState();
     const ending = getEnding(state.complianceScore);

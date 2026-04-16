@@ -28,7 +28,7 @@ type QuestEvent = 'quest-started' | 'quest-completed' | 'quest-failed' | 'object
 class QuestSystemClass {
   private static instance: QuestSystemClass;
   private quests: Map<string, Quest> = new Map();
-  private unlockedDistricts: Set<string> = new Set(['hq', 'server']);
+  private unlockedDistricts: Set<string> = new Set(['hq']);
   private listeners: Map<QuestEvent, Array<(quest: Quest, objectiveId?: string) => void>> = new Map();
 
   private constructor() {}
@@ -155,6 +155,11 @@ class QuestSystemClass {
     this.listeners.get(event)!.push(cb);
   }
 
+  off(event: QuestEvent, cb: (quest: Quest, objectiveId?: string) => void): void {
+    const arr = this.listeners.get(event) ?? [];
+    this.listeners.set(event, arr.filter(fn => fn !== cb));
+  }
+
   getAllQuests(): Quest[] {
     return Array.from(this.quests.values());
   }
@@ -177,7 +182,7 @@ class QuestSystemClass {
 
   reset(): void {
     this.quests.clear();
-    this.unlockedDistricts = new Set(['hq', 'server']);
+    this.unlockedDistricts = new Set(['hq']);
     this.listeners.clear();
   }
 

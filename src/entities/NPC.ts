@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { NPC_INTERACTION_DISTANCE, COLORS } from '../constants';
+import { NPC_INTERACTION_DISTANCE, COLORS, FONT_UI } from '../constants';
 
 export interface NPCConfig {
   id: string;
@@ -35,20 +35,22 @@ export class NPC extends Phaser.GameObjects.Sprite {
     scene.add.existing(this);
     this.setDepth(8);
 
-    // Name label
+    // Name label — hidden until player is nearby
     this.nameLabel = scene.add.text(config.x, config.y - this.height / 2 - 20, config.name, {
-      fontFamily: 'Courier New',
-      fontSize: '11px',
+      fontFamily: FONT_UI,
+      fontSize: '13px',
       color: COLORS.TEXT_HIGHLIGHT,
       backgroundColor: '#00000099',
-      padding: { x: 4, y: 2 },
-    }).setOrigin(0.5, 1).setDepth(15);
+      padding: { x: 5, y: 3 },
+    }).setOrigin(0.5, 1).setDepth(15).setVisible(false);
 
-    this.roleLabel = scene.add.text(config.x, config.y - this.height / 2 - 6, `[${config.role}]`, {
-      fontFamily: 'Courier New',
-      fontSize: '9px',
+    this.roleLabel = scene.add.text(config.x, config.y - this.height / 2 - 4, config.role, {
+      fontFamily: FONT_UI,
+      fontSize: '11px',
       color: COLORS.TEXT_SECONDARY,
-    }).setOrigin(0.5, 1).setDepth(15);
+      backgroundColor: '#00000077',
+      padding: { x: 4, y: 2 },
+    }).setOrigin(0.5, 1).setDepth(15).setVisible(false);
 
     // Invisible interaction zone
     this.interactionZone = scene.add.zone(config.x, config.y, NPC_INTERACTION_DISTANCE * 2, NPC_INTERACTION_DISTANCE * 2);
@@ -58,17 +60,17 @@ export class NPC extends Phaser.GameObjects.Sprite {
     this.proximityBubble = scene.add.container(config.x, config.y - 36);
     const bubbleBg = scene.add.circle(0, 0, 10, 0x00ffcc, 0.85);
     const bubbleText = scene.add.text(0, 0, '!', {
-      fontFamily: 'Courier New',
+      fontFamily: FONT_UI,
       fontSize: '14px',
       color: '#000000',
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
-    const hintText = scene.add.text(14, 0, '[ E ]', {
-      fontFamily: 'Courier New',
-      fontSize: '10px',
+    const hintText = scene.add.text(14, 0, 'E', {
+      fontFamily: FONT_UI,
+      fontSize: '11px',
       color: '#00ffcc',
       backgroundColor: '#00000088',
-      padding: { x: 3, y: 2 },
+      padding: { x: 4, y: 2 },
     }).setOrigin(0, 0.5);
     this.proximityBubble.add([bubbleBg, bubbleText, hintText]);
     this.proximityBubble.setDepth(20).setVisible(false);
@@ -108,6 +110,8 @@ export class NPC extends Phaser.GameObjects.Sprite {
 
     // Show/hide proximity bubble with pulse tween
     if (this.isPlayerNear && !wasNear) {
+      this.nameLabel.setVisible(true);
+      this.roleLabel.setVisible(true);
       this.proximityBubble.setVisible(true);
       this.proximityBubble.setScale(0.5);
       this.scene.tweens.add({
@@ -125,6 +129,8 @@ export class NPC extends Phaser.GameObjects.Sprite {
         ease: 'Sine.easeInOut',
       });
     } else if (!this.isPlayerNear && wasNear) {
+      this.nameLabel.setVisible(false);
+      this.roleLabel.setVisible(false);
       this.proximityBubble.setVisible(false);
       this.proximityTween?.stop();
       this.proximityTween = undefined;

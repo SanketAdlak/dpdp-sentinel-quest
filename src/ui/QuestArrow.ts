@@ -4,18 +4,35 @@ import { QuestSystem } from '../systems/QuestSystem';
 
 // Maps NPC IDs to their world positions
 const NPC_WORLD_POSITIONS: Record<string, { x: number; y: number }> = {
-  auditor: { x: 200, y: 180 },
-  dev:     { x: 808, y: 200 },
-  ceo:     { x: 350, y: 300 },
-  lawyer:  { x: 200, y: 720 },
-  meity:   { x: 808, y: 1200 },
+  auditor:    { x: 200,  y: 180  },
+  ceo:        { x: 350,  y: 300  },
+  dev:        { x: 808,  y: 200  },
+  lawyer:     { x: 200,  y: 720  },
+  marketing:  { x: 700,  y: 650  },
+  rbi:        { x: 1350, y: 200  },
+  safeharbor: { x: 1350, y: 650  },
+  cloud:      { x: 250,  y: 1200 },
+  meity:      { x: 808,  y: 1200 },
 };
 
-// Maps quest objectives to NPC targets
+// Maps quest objective IDs to target NPC IDs
 const OBJECTIVE_NPC_MAP: Record<string, string> = {
-  'talk_rakesh': 'auditor',
-  'talk_priya':  'dev',
-  'talk_anjali': 'lawyer',
+  // Stage 1 — HQ
+  'talk_rakesh':         'auditor',
+  'talk_ceo':            'ceo',
+  // Stage 2 — Server District
+  'talk_priya':          'dev',
+  'complete_pii_scan':   'dev',     // point to Priya's room until scan done
+  // Stage 3 — Legal Tower
+  'talk_anjali':         'lawyer',
+  // Stage 4 — Multiple rooms
+  'review_consent':      'marketing',
+  'check_retention':     'rbi',
+  'safeguard_children':  'safeharbor',
+  // Stage 5 — Audit Plaza
+  'talk_gupta':          'meity',
+  'audit_round1':        'meity',
+  'audit_round2':        'meity',
 };
 
 export class QuestArrow {

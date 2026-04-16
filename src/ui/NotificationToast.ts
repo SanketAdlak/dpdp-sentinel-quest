@@ -20,11 +20,12 @@ const TYPE_COLORS: Record<ToastType, { bg: string; border: string; icon: string 
 export class NotificationToast {
   private scene: Phaser.Scene;
   private activeToasts: Phaser.GameObjects.Container[] = [];
-  private readonly TOAST_WIDTH = 420;
-  private readonly TOAST_PADDING = 16;
+  private readonly TOAST_WIDTH = 400;
+  private readonly TOAST_PADDING = 14;
   private readonly TOAST_START_X: number;
-  private readonly TOAST_START_Y = 20;
-  private readonly TOAST_GAP = 8;
+  // Start below the HUD bar (56px) with a small gap — never overlaps HUD or world labels
+  private readonly TOAST_START_Y = 64;
+  private readonly TOAST_GAP = 6;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;

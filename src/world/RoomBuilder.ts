@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { GAME_WIDTH } from '../constants';
 
 export interface RoomDef {
   id: string;
@@ -52,7 +53,7 @@ export const ROOM_DEFS: RoomDef[] = [
   },
   {
     id: 'rbi', x: 1216, y: 0, w: 512, h: 416,
-    name: '🏦 RBI Vault', subtitle: 'Retention Rules (§8.7)',
+    name: '🏦 RBI Vault', subtitle: 'Data Retention (§8.7)',
     floorColor: 0xAA8833, floorAltColor: 0x997722,
     wallTopColor: 0x886611, wallFaceColor: 0x664400,
     doors: [
@@ -698,13 +699,21 @@ export class RoomBuilder {
   }
 
   private addRoomLabel(room: RoomDef): void {
-    const lx = room.x + 32 + 10;
     const ly = room.y + 32 + 10;
+
+    // For rooms whose left edge is within GAME_WIDTH of the world right side,
+    // right-anchor the chip so it doesn't clip the canvas when scrollX is low.
+    const WORLD_W = 1728;
+    const CHIP_W = 200;
+    const rightAnchored = (room.x + CHIP_W) > WORLD_W - GAME_WIDTH + 80;
+    const lx = rightAnchored
+      ? room.x + room.w - CHIP_W - 10   // right-side rooms: label flush to room right
+      : room.x + 32 + 10;               // normal rooms: label near top-left
 
     // Translucent chip behind the label for readability over any floor colour
     const chip = this.scene.add.graphics().setDepth(5);
     chip.fillStyle(0x000000, 0.45);
-    chip.fillRoundedRect(lx - 4, ly - 2, 200, 38, 4);
+    chip.fillRoundedRect(lx - 4, ly - 2, CHIP_W, 38, 4);
 
     this.scene.add.text(lx, ly, room.name, {
       fontFamily: "'Inter', system-ui, Arial, sans-serif",
